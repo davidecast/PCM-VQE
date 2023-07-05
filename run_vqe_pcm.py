@@ -84,6 +84,9 @@ vqe.set_openfermion_molecular_hamiltonian_jordan_wigner()
 vqe.set_up_ansatz_and_guess()
 vqe.set_optimizer()
 
+if compute_dipole_moment:
+        vqe.save_rdm = True
+
 result = vqe.run()
 
 if compute_dipole_moment:
