@@ -41,6 +41,7 @@ class PCM_VQE():
         self.molecule_options = molecule_options    ### when a geometry is given the standard PL workflow is executed (is the real "/path/to/file.xyz")
         self.rdm1_obs = None
         self.rdm2_obs = None
+        self.save_rdm = False
         self.transformed_molecular_integrals_one_body = None
         self.transformed_molecular_integrals_two_body = None
         self.circuit = None
@@ -118,6 +119,8 @@ class PCM_VQE():
     
     def cost_function(self, params):
         one_electron_rdm = self.compute_1rdm(params)
+        if self.save_rdm:  ##### correct usage only for dipole moment calculation (see run file example)
+            self.density_matrices.append(one_electron_rdm)
         cost_function = self.compute_electronic_contribution(params) #vacuum
         #cost_function = self.compute_electronic_contribution_sparse(params) #vacuum
         #print(cost_function)
