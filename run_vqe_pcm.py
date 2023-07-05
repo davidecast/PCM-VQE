@@ -8,6 +8,7 @@ import time
 from vqe_pcm_pennylane import PCM_VQE
 import psi4
 import pennylane.numpy as np
+import density_matrix_helper
 np.set_printoptions(precision=5, linewidth=200, suppress=True)
 
 mol = psi4.geometry("""
@@ -48,8 +49,17 @@ psi4.driver.p4util.pcm_helper("""Units = Angstrom
 print('\nStarting SCF and integral build...')
 t = time.time()
 
+compute_dipole_moment = False #### change to True to allow permanent dipole moment calculation
+
 # First compute SCF energy using Psi4
 scf_e, wfn = psi4.energy('SCF', return_wfn=True)
+
+if compute_dipole_moment:
+        nuc_dipole = mol.nuclear_dipole() #### array of 3 elements (cartesian components x,y,z) for the nuclear contribution
+        mints = psi4.core.MintsHelper(wfn.basisset())
+        dx = np.array((mints.ao_dipole()[0])
+        dy = np.array((mints.ao_dipole()[1])
+        dz = np.array((mints.ao_dipole()[2])
 
 vqe_options = {'max_iterations': 20,
                'PCM': True,
@@ -75,6 +85,16 @@ vqe.set_up_ansatz_and_guess()
 vqe.set_optimizer()
 
 result = vqe.run()
+
+if compute_dipole_moment:
+        rdm_mo_basis = density_matrix_helper.density_matrix_to_array(result["density_matrix"][-1])
+        rdm1_ao_basis = general_basis_change(rdm_mo_basis, np.transpose(np.asarray(wfn.Ca())), (1, 0))
+        dipole_moment = []
+        dipole_moment.append(np.trace(np.dot(rdm1_ao_basis, dx)) + nuc_dipole[0])
+        dipole_moment.append(np.trace(np.dot(rdm1_ao_basis, dy)) + nuc_dipole[1])
+        dipole_moment.append(np.trace(np.dot(rdm1_ao_basis, dz)) + nuc_dipole[2])
+        np.save("dipole_moment.npy", dipole_moment)
+
 
 #np.save("vqe_pcm_result.npy", result)
 np.save("vqe_pcm_result_energy.npy", result["energy"])
