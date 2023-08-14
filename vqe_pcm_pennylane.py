@@ -71,6 +71,12 @@ class PCM_VQE():
             mo_eri = np.einsum('psqr', mo_eri)
             mo_eri = general_basis_change(mo_eri, C, (1, 1, 0, 0))
             self.transformed_molecular_integrals_one_body, self.transformed_molecular_integrals_two_body = molecular_data.spinorb_from_spatial(H ,mo_eri)
+            if self.save_rdm:
+                self.dipole_ints = []
+                dipole_integrals = np.asarray(mints.ao_dipole())
+                for k in range(len(dipole_integrals)):
+                    dipole_integrals[k] = general_basis_change(dipole_integrals[k], C, (1, 0))
+                    self.dipole_ints.append(molecular_data.spinorb_from_spatial(dipole_integrals[k]))
         
     
     def build_rdms_observable(self):
@@ -130,6 +136,11 @@ class PCM_VQE():
         #print(cost_function)
         return cost_function
 
+    def compute_dipole_moment(self, params):
+        return [pl.vqe.ExpvalCost(self.circuit, self.dipole_operator[0], self.dev, optimize = True)(params),
+                pl.vqe.ExpvalCost(self.circuit, self.dipole_operator[1], self.dev, optimize = True)(params), 
+                pl.vqe.ExpvalCost(self.circuit, self.dipole_operator[2], self.dev, optimize = True)(params)]
+    
     def compute_electronic_contribution(self, params):
         #pl.vqe.ExpvalCost(pl.SparseHamiltonian(self.molecular_hamiltonian, wires=range(self.qubits)), optimize = True)(params)
         return pl.vqe.ExpvalCost(self.circuit, self.molecular_hamiltonian, self.dev, optimize = True)(params)
@@ -169,6 +180,13 @@ class PCM_VQE():
             fermionic_hamiltonian = get_fermion_operator(molecular_hamiltonian)
             transformed_to_qubit = jordan_wigner(fermionic_hamiltonian)
             self.molecular_hamiltonian = convert_observable(transformed_to_qubit)
+            if self.save_rdm:
+                self.dipole_operator = []
+                for k in range(len(self.dipole_ints)):
+                    dipole_operator = reps.InteractionOperator(self.dipole_ints[k])
+                    fermionic_dipole = get_fermion_operator(dipole_operator)
+                    dipole_to_qubit = jordan_wigner(fermionic_dipole)
+                    self.dipole_operator.append(convert_observable(dipole_to_qubit))
         else:
             pass
 
@@ -241,6 +259,10 @@ class PCM_VQE():
             #if conv <= self.options['conv_tol']:
             #    break
         print('Final value of the ground-state energy = {:.8f} Ha'.format(energy))
+        if self.save_rdm:
+            print('Computing dipole moment ...')
+            dipole_moment = self.compute_dipole_moment(params)
+            print(dipole_moment)
         #print('Accuracy with respect to the CCSD-PCM energy: {:.8f} Ha ({:.8f} kcal/mol)'.format(np.abs(energy - (-1.137391597913367)), np.abs(energy - (-1.137391597913367))*627.503))
         return result
     
